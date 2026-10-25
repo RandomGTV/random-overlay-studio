@@ -1,0 +1,1 @@
+{"name":"random-overlay-studio","private":true,"type":"module","scripts":{"test":"node --test tests/*.test.mjs","build":"node scripts/build.mjs","dev":"node scripts/serve.mjs"},"engines":{"node":">=20"}}
