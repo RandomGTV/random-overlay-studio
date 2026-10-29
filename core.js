@@ -1,4 +1,4 @@
-export const DEFAULT_DESIGN={theme:'auto',regularTheme:'drops',gameThemes:{},density:'balanced',motion:'sweep',borderMotion:'glow',logoRing:true,showChannelStats:true,showArtwork:true,showUpcoming:true,upcomingHours:72,quietMode:'branding',footerEnabled:true,footerSize:'regular',footerRotationSeconds:15,footerShowStats:true,footerMessages:[],confirmedDropsGame:''};
+export const DEFAULT_DESIGN={theme:'auto',regularTheme:'drops',gameThemes:{},density:'balanced',motion:'sweep',borderMotion:'glow',logoRing:true,showChannelStats:true,showArtwork:true,showRewardShowcase:true,showUpcoming:true,upcomingHours:72,quietMode:'branding',footerEnabled:true,footerSize:'regular',footerRotationSeconds:15,footerShowStats:true,footerMessages:[],confirmedDropsGame:''};
 export const DEFAULT_CONFIG={schemaVersion:1,channel:'random_gtv',channelId:'190784868',mode:'auto',rotationSeconds:12,categorySource:'twitch',manualGameName:'',manualGameId:'',manualCards:[],design:DEFAULT_DESIGN};
 export const MAX_FEED_AGE=7200000,MAX_PROFILE_AGE=300000;
 export function gameKey(name,id=''){return String(id||name||'').normalize('NFKC').toLowerCase().trim().replace(/\s+/g,' ');}
@@ -14,7 +14,7 @@ export function validateConfig(input){
  if(c.categorySource==='manual'&&!c.manualGameName.trim()&&!c.manualGameId)throw Error('Enter a manual game name or ID.');
  const themes=['stealth','tactical','neon','ember','arctic','drops','midnight','royal'];
  for(const[k,allowed]of Object.entries({theme:['auto',...themes],regularTheme:['drops','midnight','royal'],density:['minimal','balanced','detailed'],motion:['none','sweep','shimmer'],borderMotion:['none','glow','trace'],quietMode:['branding','compact'],footerSize:['regular','slim']}))if(!allowed.includes(d[k]))throw Error('Invalid design setting: '+k);
- for(const k of ['logoRing','showChannelStats','showArtwork','showUpcoming','footerEnabled','footerShowStats'])if(typeof d[k]!=='boolean')throw Error(k+' must be true or false.');
+ for(const k of ['logoRing','showChannelStats','showArtwork','showRewardShowcase','showUpcoming','footerEnabled','footerShowStats'])if(typeof d[k]!=='boolean')throw Error(k+' must be true or false.');
  if(![24,72,168].includes(d.upcomingHours))throw Error('Upcoming window must be 24, 72 or 168 hours.');
  if(!Number.isInteger(d.footerRotationSeconds)||d.footerRotationSeconds<8||d.footerRotationSeconds>60)throw Error('Footer rotation must be 8–60 seconds.');
  if(!Array.isArray(d.footerMessages)||d.footerMessages.length>8||d.footerMessages.some(x=>typeof x!=='string'||!x.trim()||x.length>160))throw Error('Use up to eight footer messages, 1–160 characters each.');
@@ -52,3 +52,47 @@ export function themeFor(library,config,gameName='',gameId=''){
  const d=config.design;let key=d.theme;if(key==='auto'){key=d.gameThemes[gameKey(gameName,gameId)];if(!key){const n=gameKey(gameName),groups=[['stealth',['hitman','assassin','valorant']],['tactical',['counter-strike','call of duty','battlefield','escape from tarkov']],['ember',['warcraft','diablo','elden ring','throne','elder scrolls']],['neon',['fortnite','cyberpunk','apex','marvel']],['arctic',['destiny','warframe','overwatch','sea of thieves']]];key=groups.find(([,terms])=>terms.some(t=>n.includes(t)))?.[0]||d.regularTheme;}}return library.themes.find(t=>t.id===key)||library.themes.find(t=>t.id==='drops');
 }
 export function countdown(target,now=Date.now()){const m=Math.max(0,Math.ceil((target-now)/60000));return m>=1440?Math.floor(m/1440)+'d '+Math.floor(m%1440/60)+'h':m>=60?Math.floor(m/60)+'h '+m%60+'m':m+'m';}
+
+export function normalizeRewardCampaigns(campaigns){
+ if(!Array.isArray(campaigns))throw Error('Unexpected reward-campaign feed.');
+ const cards=[],seen=new Set(),clean=(v,n)=>typeof v==='string'?v.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,n):'';
+ for(const c of campaigns){
+  if(!c||!c.id||!['ACTIVE','UPCOMING','UNKNOWN'].includes(c.status))continue;
+  const start=Date.parse(c.startsAt),end=Date.parse(c.endsAt);
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)continue;
+  const groups=Array.isArray(c.rewardGroups)&&c.rewardGroups.length?c.rewardGroups:[{id:'default',rewards:c.rewards,unlockRequirements:c.unlockRequirements}];
+  for(const g of groups){
+   const req=g.unlockRequirements||c.unlockRequirements||{},requirements=[];
+   for(const[k,label]of [['minuteWatchedGoal','min watch time'],['subsGoal','qualifying subscription(s)'],['turboSubsGoal','qualifying Turbo subscription(s)'],['eventTriggerGoal','qualifying campaign action(s)']]){
+    const n=Number(req[k]);if(Number.isFinite(n)&&n>0)requirements.push(n+' '+label);
+   }
+   for(const r of Array.isArray(g.rewards)?g.rewards:[]){
+    if(!r?.id)continue;
+    const until=r.earnableUntil?Date.parse(r.earnableUntil):end,finish=Math.min(end,until);
+    if(!Number.isFinite(finish)||finish<=start)continue;
+    const id='reward:'+c.id+':'+g.id+':'+r.id;if(seen.has(id))continue;seen.add(id);
+    const image=[r.thumbnailImage?.image1xURL,r.bannerImage?.image1xURL,c.image?.image1xURL].find(artworkUrl)||'';
+    cards.push({id,kind:'reward',name:clean(r.name||c.name,120),campaign:clean(c.name,120),brand:clean(c.brand,60),image,start,end:finish,
+     gameName:clean(c.game?.displayName,150),gameId:String(c.game?.id||''),sitewide:c.isSitewide===true,
+     requirement:requirements.join(' + ')||'See Twitch campaign requirements',
+     detail:clean(c.summary||c.instructions,220),
+     terms:'Check participating categories, purchases and account eligibility in Twitch.'});
+   }
+  }
+ }
+ return cards;
+}
+export function selectShowcase(cards,rewards,config,profile,dropUpdatedAt,rewardUpdatedAt,now=Date.now()){
+ const drops=selectCards(cards,config,profile,dropUpdatedAt,now);
+ const current=drops.cards.filter(c=>c.start<=now);
+ if(current.length)return{...drops,cards:current,kind:'drops',fallback:false};
+ let campaigns=[];
+ if(freshAt(rewardUpdatedAt,MAX_FEED_AGE,now)){
+  campaigns=rewards.filter(c=>c.start<=now&&c.end>now&&c.end>c.start&&(c.sitewide===true||
+   ['manual','detected'].includes(drops.gameStatus)&&(c.gameId?c.gameId===String(drops.gameId):c.gameName&&gameKey(c.gameName)===gameKey(drops.gameName))))
+   .toSorted((a,b)=>a.end-b.end||String(a.id).localeCompare(String(b.id)));
+ }
+ if(campaigns.length)return{...drops,cards:campaigns,kind:'rewards',fallback:true};
+ if(drops.cards.length)return{...drops,kind:'drops',fallback:false};
+ return{...drops,kind:'branding',fallback:true};
+}

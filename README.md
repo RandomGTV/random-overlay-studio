@@ -51,3 +51,11 @@ Open http://127.0.0.1:9488/. Configure repository **Settings → Pages → Sourc
 - Theme art: existing generated assets; original prompts are in `assets/themes/GENERATED-ART-PROMPTS.json`.
 
 Not affiliated with Twitch, the data providers or game publishers. No embedded test campaigns or credentials are published.
+
+## Reward showcase and Twitch Reward Campaigns
+
+The top bar now showcases larger reward artwork, clear requirements, a campaign label, reward position, ending countdown and smooth transitions. Turn off **Large reward showcase** in the dashboard to use the original compact sizing. At 1920px width the showcase is 96px (minimal), 144px (balanced) or 176px (detailed) high; the gameplay area remains transparent.
+
+Selection order: **active matching Drops → active Twitch Reward Campaigns → matching upcoming Drops → channel branding**. Reward Campaigns are separate from Channel Points rewards. Sitewide offers may appear independently of the current game; game-specific offers require a matching known category. Terms, participating categories, regional/account limits and qualifying purchases still apply. The overlay does not verify eligibility or claim rewards, and never reuses the Drops-enabled confirmation for Reward Campaigns.
+
+The additional public feeds are `https://raw.githubusercontent.com/SunkwiBOT/twitch-drops-api/main/rewards.json` (commit-pinned when read) and `https://twitch-drops-api.sunkwi.com/v2/rewards`. Campaign-specific and group-specific watch/subscription/Turbo/action requirements are preserved; reward-specific earning deadlines are respected. Expired or stale offers are hidden. Sources refresh every five minutes with a five-minute same-origin browser cache. The embedded dashboard preview shares the parent feed to avoid duplicate provider calls. No API key or paid backend is required. Provider outages and rate limits can temporarily leave branding visible.

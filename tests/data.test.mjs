@@ -1,3 +1,13 @@
 import test from'node:test';import assert from'node:assert/strict';import{setImmediate}from'node:timers/promises';import{LiveData,watchVersion}from'../data.js';
 test('published settings update without restarting; invalid updates retain last valid settings',async()=>{const old=globalThis.fetch;try{let body={mode:'auto',rotationSeconds:20};globalThis.fetch=async()=>({ok:true,text:async()=>JSON.stringify(body)});const data=new LiveData();await data.readConfig();assert.equal(data.config.rotationSeconds,20);body={mode:'auto',rotationSeconds:30};await data.readConfig();assert.equal(data.config.rotationSeconds,30);body={mode:'auto',rotationSeconds:0};await data.readConfig();assert.equal(data.config.rotationSeconds,30);assert.match(data.errors.config,/6–60/);data.stop();}finally{globalThis.fetch=old;}});
 test('code release reload preserves OBS bar selection and changes the cache-busting URL',async()=>{const saved={fetch:globalThis.fetch,setInterval:globalThis.setInterval,clearInterval:globalThis.clearInterval,location:globalThis.location};try{let version='first',interval,replaced;globalThis.fetch=async()=>({ok:true,text:async()=>JSON.stringify({id:version})});globalThis.setInterval=fn=>(interval=fn,1);globalThis.clearInterval=()=>{};globalThis.location={href:'https://example.github.io/overlay/overlay.html?bars=top',replace:url=>{replaced=url;}};const stop=watchVersion();await setImmediate();assert.equal(replaced,undefined);version='second';interval();await setImmediate();const u=new URL(replaced);assert.equal(u.searchParams.get('bars'),'top');assert.equal(u.searchParams.get('_release'),'second');stop();}finally{Object.assign(globalThis,saved);}});
+
+test('reward feed falls back independently and retains last valid cards on network failure',async()=>{
+ const old=globalThis.fetch,now=new Date().toISOString();
+ const campaign={id:'c',name:'Offer',status:'UNKNOWN',isSitewide:true,startsAt:'2020-01-01T00:00:00Z',endsAt:'2099-01-01T00:00:00Z',rewards:[{id:'r',name:'Badge'}]};
+ try{
+  const urls=[];globalThis.fetch=async url=>{urls.push(String(url));if(String(url).includes('/commits'))throw Error('Mirror down');return{ok:true,text:async()=>JSON.stringify({lastUpdatedAt:now,data:[campaign]})};};
+  const d=new LiveData();await d.readRewards();assert.equal(d.rewardCards.length,1);assert.equal(d.cards.length,0);assert.equal(d.rewardSource,'Sunkwi public API');assert(urls.some(u=>u.endsWith('/v2/rewards')));
+  globalThis.fetch=async()=>{throw Error('Offline')};await d.readRewards();assert.equal(d.rewardCards.length,1);assert.equal(d.rewardUpdatedAt,now);assert.match(d.errors.rewards,/Offline/);d.stop();
+ }finally{globalThis.fetch=old;}
+});
