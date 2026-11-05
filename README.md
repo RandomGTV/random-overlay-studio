@@ -45,7 +45,7 @@ Open http://127.0.0.1:9488/. Configure repository **Settings → Pages → Sourc
 
 - Public channel lookup: https://api.ivr.fi/v2/twitch/user?login=random_gtv
 - Public campaign mirror: https://github.com/SunkwiBOT/twitch-drops-api
-- Alternate campaign API: https://twitch-drops-api.sunkwi.com/v2/drops
+- Alternate campaign API: https://drops.sunkwi.com/api/twitch/drops
 - Reward/identity images: https://static-cdn.jtvnw.net/
 - Channel identity and avatar: https://www.twitch.tv/random_gtv
 - Theme art: existing generated assets; original prompts are in `assets/themes/GENERATED-ART-PROMPTS.json`.
