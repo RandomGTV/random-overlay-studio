@@ -13,9 +13,9 @@ async function publicFeed(file,route){
   return keep({lastUpdatedAt:date,data:await getJson('https://raw.githubusercontent.com/SunkwiBOT/twitch-drops-api/'+c.sha+'/'+file),source:'SunkwiBOT public GitHub mirror'});
  }catch(e){errors.push(e.message);}
  try{
-  const payload=await getJson('https://twitch-drops-api.sunkwi.com/v2/'+route);
-  if(!freshAt(payload.lastUpdatedAt,MAX_FEED_AGE))throw Error('Feed is older than two hours.');
-  return keep({...payload,source:'Sunkwi public API'});
+  const payload=await getJson('https://drops.sunkwi.com/api/twitch/'+route);
+  if(!freshAt(payload.refreshedAt,MAX_FEED_AGE))throw Error('Feed is older than two hours.');
+  return keep({lastUpdatedAt:payload.refreshedAt,data:route==='drops'?payload.games:payload.campaigns,source:'Sunkwi public API'});
  }catch(e){errors.push(e.message);}
  throw Error(errors.join(' / '));
 }
